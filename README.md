@@ -1,40 +1,125 @@
-### 1. `train.py` (Script Huấn luyện Mô hình)
-Đây là "trái tim" của quá trình học máy. File này chỉ cần chạy 1 lần để tạo ra mô hình.
-* **Tải dữ liệu:** Sử dụng thư viện `datasets` để tải bộ dữ liệu chuẩn `uitnlp/vihsd` (hơn 30,000 bình luận tiếng Việt) từ Hugging Face.
-* **Tiền xử lý:** Làm sạch dữ liệu, xử lý các dòng trống (None) và gộp nhãn (Offensive/Hate gộp chung thành 1 nhãn Toxic).
-* **Trích xuất đặc trưng (Feature Extraction):** Sử dụng `TfidfVectorizer` để chuyển đổi văn bản tiếng Việt thành các ma trận số học (giới hạn 10,000 từ phổ biến nhất).
-* **Huấn luyện (Training):** Sử dụng thuật toán `LogisticRegression` để học cách phân loại từ các ma trận số học đó.
-* **Lưu mô hình:** Sử dụng thư viện `joblib` để xuất (dump) mô hình và bộ từ điển ra thành 2 file `.pkl` để web app có thể sử dụng lại mà không cần train lại.
 
-### 2. `app.py` (Giao diện Web / MVP Dashboard)
-Đây là file chạy giao diện người dùng bằng thư viện Streamlit.
-* **Load Models:** Đọc 2 file `.pkl` đã được tạo ra từ `train.py`.
-* **Giao diện:** Tạo ô nhập văn bản (Text Area) cho người dùng nhập bình luận.
-* **Dự đoán:** Khi bấm nút "Kiểm duyệt", hệ thống vector hóa câu bình luận và đưa vào mô hình để dự đoán (0 = An toàn, 1 = Độc hại).
-* **Explainable AI (Top Terms):** Trích xuất các từ có trọng số TF-IDF cao nhất trong câu bình luận để giải thích cho người dùng biết từ ngữ nào khiến hệ thống đánh dấu đây là câu độc hại.
+* 📊 Kết quả Baseline vs PhoBERT
+* ⚠️ Giải thích vì sao không upload PhoBERT
+* 📦 Thông tin dataset
+* ☁️ Ghi rõ train bằng Google Colab
 
-### 3. `toxic_model.pkl` & `tfidf_vectorizer.pkl` (Trọng số Mô hình)
-* **`toxic_model.pkl`**: Là "bộ não" đã được huấn luyện, chứa các quy tắc toán học để quyết định một câu là an toàn hay độc hại.
-* **`tfidf_vectorizer.pkl`**: Là "bộ từ điển" lưu trữ danh sách các từ vựng và cách chuyển chúng thành số liệu. 
+---
 
-### 4. `requirements.txt` (Danh sách Môi trường)
-Chứa danh sách các thư viện Python (`streamlit`, `scikit-learn`, `datasets`, `joblib`) để đảm bảo code chạy đồng nhất trên mọi máy tính.
+# 📊 Experimental Results
 
-## 🚀 Hướng dẫn cài đặt và chạy Website 
+## Dataset Information
 
-Để chạy giao diện web và test thử các câu bình luận phục vụ báo cáo/thuyết trình, các thành viên làm theo đúng các bước sau:
+* Dataset: **ViHSD (UIT NLP)**
+* Tổng số mẫu: 33,400
+* Tập Test: 6,680 mẫu
 
-**Bước 1: Mở Terminal tại thư mục dự án**
-1. Giải nén folder chứa code.
-2. Click chuột vào thanh địa chỉ của folder, gõ `cmd` và nhấn **Enter** để mở Terminal.
+  * Safe: 5,548
+  * Toxic: 1,132
+* Nhãn được gộp:
 
-**Bước 2: Cài đặt thư viện (Chỉ làm 1 lần)**
-Copy dòng lệnh dưới đây dán vào Terminal và nhấn **Enter**:
-```bash
+  * 0 → Safe
+  * 1,2 → Toxic
+
+Kích thước dataset có thể kiểm tra bằng:
+
+```python
+len(dataset["train"])
+len(dataset["test"])
+```
+
+---
+
+# 🧠 Baseline Model (TF-IDF + Logistic Regression)
+
+**Accuracy: 0.88**
+
+| Class | Precision | Recall | F1-score | Support |
+| ----- | --------- | ------ | -------- | ------- |
+| Safe  | 0.89      | 0.98   | 0.93     | 5548    |
+| Toxic | 0.83      | 0.40   | 0.54     | 1132    |
+
+Macro F1-score: **0.74**
+Weighted F1-score: **0.87**
+
+### Nhận xét:
+
+* Baseline có Recall rất cao với lớp Safe.
+* Tuy nhiên Recall của Toxic chỉ 0.40 → bỏ sót nhiều bình luận độc hại.
+* Phù hợp làm mô hình nền để so sánh.
+
+---
+
+# 🧠 PhoBERT Model (Transformers + PyTorch)
+
+Huấn luyện bằng **Google Colab (GPU environment)**.
+
+**Accuracy: 0.89**
+
+| Class | Precision | Recall | F1-score | Support |
+| ----- | --------- | ------ | -------- | ------- |
+| Safe  | 0.92      | 0.95   | 0.93     | 5548    |
+| Toxic | 0.70      | 0.59   | 0.64     | 1132    |
+
+Macro F1-score: **0.79**
+Weighted F1-score: **0.88**
+
+### Nhận xét:
+
+* PhoBERT cải thiện đáng kể Recall của lớp Toxic (0.59 so với 0.40).
+* Macro F1-score cao hơn Baseline.
+* Khả năng hiểu ngữ cảnh tốt hơn TF-IDF.
+
+---
+
+# 📈 So sánh nhanh
+
+| Metric       | Baseline | PhoBERT |
+| ------------ | -------- | ------- |
+| Accuracy     | 0.88     | 0.89    |
+| Toxic Recall | 0.40     | 0.59    |
+| Macro F1     | 0.74     | 0.79    |
+
+PhoBERT cho hiệu suất tốt hơn đặc biệt ở lớp Toxic.
+
+---
+
+# ⚠️ Lưu ý về PhoBERT Model
+
+Thư mục PhoBERT không được upload lên GitHub do kích thước lớn (~460MB).
+
+GitHub giới hạn:
+
+* Tối đa 100MB / file
+
+Do đó, repository này chỉ chứa:
+
+* Code huấn luyện
+* Kết quả thực nghiệm
+* Mô hình Baseline (.pkl)
+
+PhoBERT được huấn luyện trên Google Colab và chỉ sử dụng để đánh giá và so sánh trong báo cáo.
+
+---
+
+# 🚀 Khi pull repository này
+
+Người dùng vẫn có thể chạy hệ thống bằng Baseline model:
+
+```
 pip install -r requirements.txt
-
-Bước 3: Khởi chạy Website
-Sau khi cài xong, copy lệnh này dán vào Terminal và nhấn Enter:
-Bash
-
 python -m streamlit run app.py
+```
+
+Website sẽ hoạt động bình thường với mô hình TF-IDF + Logistic Regression.
+
+---
+
+# 🖥 Training Environment
+
+* Baseline: Train local (CPU)
+* PhoBERT: Train trên Google Colab (GPU)
+* Framework: HuggingFace Transformers + PyTorch
+
+---
+
